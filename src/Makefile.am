@@ -1,3 +1,5 @@
+SUBDIRS = theatrics
+
 NULL =
 
 bin_PROGRAMS = gnome-terminal
@@ -12,6 +14,12 @@ BUILT_SOURCES = \
 gnome_terminal_SOURCES= \
 	eggshell.c \
 	eggshell.h \
+	gedit-animatable.c \
+	gedit-animatable.h \
+	gedit-animated-overlay.c \
+	gedit-animated-overlay.h \
+	gedit-floating-slider.c \
+	gedit-floating-slider.h \
 	profile-editor.c \
 	profile-editor.h \
 	terminal.c \
@@ -77,7 +85,8 @@ gnome_terminal_CFLAGS = \
 gnome_terminal_LDFLAGS =
 
 gnome_terminal_LDADD = \
-	$(TERM_LIBS)
+	$(TERM_LIBS) \
+	theatrics/libtheatrics.la
 
 if WITH_SMCLIENT
 gnome_terminal_SOURCES += \

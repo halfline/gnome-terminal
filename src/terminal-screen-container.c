@@ -22,13 +22,23 @@
 #include "terminal-screen-container.h"
 #include "terminal-debug.h"
 #include "terminal-intl.h"
+#include "gedit-animated-overlay.h"
+#include "gedit-floating-slider.h"
 
 #include <gtk/gtk.h>
+
+#define SEARCH_POPUP_MARGIN 20
 
 #define TERMINAL_SCREEN_CONTAINER_GET_PRIVATE(screen_container)(G_TYPE_INSTANCE_GET_PRIVATE ((screen_container), TERMINAL_TYPE_SCREEN_CONTAINER, TerminalScreenContainerPrivate))
 
 struct _TerminalScreenContainerPrivate
 {
+  GtkWidget *overlay;
+  GtkWidget *slider;
+  GtkWidget *search_entry;
+  GtkWidget *go_up_button;
+  GtkWidget *go_down_button;
+
   TerminalScreen *screen;
 #ifdef USE_SCROLLED_WINDOW
   GtkWidget *scrolled_window;
@@ -141,6 +151,9 @@ terminal_screen_container_constructor (GType type,
 
   g_assert (priv->screen != NULL);
 
+  priv->overlay = gedit_animated_overlay_new ();
+  gtk_widget_show (priv->overlay);
+
 #ifdef USE_SCROLLED_WINDOW
 #if GTK_CHECK_VERSION (2, 91, 2)
   priv->scrolled_window = gtk_scrolled_window_new (gtk_scrollable_get_hadjustment(GTK_SCROLLABLE(priv->screen)),
@@ -156,8 +169,9 @@ terminal_screen_container_constructor (GType type,
                                        GTK_SHADOW_NONE);
   gtk_container_add (GTK_CONTAINER (priv->scrolled_window), GTK_WIDGET (priv->screen));
   gtk_widget_show (GTK_WIDGET (priv->screen));
-  gtk_box_pack_end (GTK_BOX (container), priv->scrolled_window, TRUE, TRUE, 0);
   gtk_widget_show (priv->scrolled_window);
+
+  gtk_container_add (GTK_CONTAINER (priv->overlay), priv->scrolled_window);
 
 #ifdef GNOME_ENABLE_DEBUG
   g_signal_connect (priv->scrolled_window, "size-request", G_CALLBACK (size_request_cb), container);
@@ -176,11 +190,33 @@ terminal_screen_container_constructor (GType type,
   gtk_box_pack_start (GTK_BOX (priv->hbox), GTK_WIDGET (priv->screen), TRUE, TRUE, 0);
   gtk_box_pack_start (GTK_BOX (priv->hbox), priv->vscrollbar, FALSE, FALSE, 0);
 
-  gtk_box_pack_end (GTK_BOX (container), priv->hbox, TRUE, TRUE, 0);
+  gtk_container_add (GTK_CONTAINER (priv->overlay), priv->hbox);
   gtk_widget_show_all (priv->hbox);
 #endif /* USE_SCROLLED_WINDOW */
 
+  gtk_box_pack_end (GTK_BOX (container), priv->overlay, TRUE, TRUE, 0);
+
   _terminal_screen_update_scrollbar (priv->screen);
+
+  /* Add slider */
+  priv->slider = gedit_floating_slider_new ();
+  gtk_widget_set_name (priv->slider, "search-slider");
+  gtk_widget_set_halign (priv->slider, GTK_ALIGN_END);
+  gtk_widget_set_valign (priv->slider, GTK_ALIGN_START);
+
+  if (gtk_widget_get_direction (priv->slider) == GTK_TEXT_DIR_LTR)
+    gtk_widget_set_margin_right (priv->slider, SEARCH_POPUP_MARGIN);
+  else
+    gtk_widget_set_margin_left (priv->slider, SEARCH_POPUP_MARGIN);
+
+  g_object_set (G_OBJECT (priv->slider),
+                "easing", GEDIT_THEATRICS_CHOREOGRAPHER_EASING_EXPONENTIAL_IN_OUT,
+                "blocking", GEDIT_THEATRICS_CHOREOGRAPHER_BLOCKING_DOWNSTAGE,
+                "orientation", GTK_ORIENTATION_VERTICAL,
+                NULL);
+
+  gedit_animated_overlay_add_animated_overlay (GEDIT_ANIMATED_OVERLAY (priv->overlay),
+                                               GEDIT_ANIMATABLE (priv->slider));
 
   return object;
 }
@@ -305,6 +341,75 @@ terminal_screen_container_class_init (TerminalScreenContainerClass *klass)
                            G_PARAM_STATIC_STRINGS));
 }
 
+static GtkWidget *
+create_button_from_symbolic (const gchar *icon_name)
+{
+  GtkWidget *button;
+
+  button = gtk_button_new ();
+  gtk_widget_set_can_focus (button, FALSE);
+  gtk_button_set_image (GTK_BUTTON (button),
+                              gtk_image_new_from_icon_name (icon_name,
+                                                            GTK_ICON_SIZE_MENU));
+
+  return button;
+}
+
+static GtkWidget *
+create_search_widget (TerminalScreenContainer *container)
+{
+  TerminalScreenContainerPrivate *priv = container->priv;
+  GtkWidget *search_widget;
+  GtkStyleContext *context;
+
+  search_widget = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
+
+  context = gtk_widget_get_style_context (search_widget);
+  gtk_style_context_add_class (context, GTK_STYLE_CLASS_LINKED);
+
+  gtk_widget_show (search_widget);
+
+  /* add entry */
+  priv->search_entry = gtk_entry_new ();
+  gtk_widget_show (priv->search_entry);
+
+  gtk_entry_set_width_chars (GTK_ENTRY (priv->search_entry), 25);
+
+  /*g_signal_connect (frame->priv->search_entry, "populate-popup",
+                    G_CALLBACK (search_entry_populate_popup),
+                    frame);
+  g_signal_connect (frame->priv->search_entry, "icon-release",
+                    G_CALLBACK (search_entry_icon_release),
+                    frame);
+  g_signal_connect (priv->search_entry, "activate",
+                    G_CALLBACK (search_entry_activate),
+                    container);*/
+
+  gtk_container_add (GTK_CONTAINER (search_widget),
+                     priv->search_entry);
+
+  /* Up/Down buttons */
+  priv->go_up_button = create_button_from_symbolic ("go-up-symbolic");
+  gtk_widget_show (priv->go_up_button);
+  gtk_box_pack_start (GTK_BOX (search_widget), priv->go_up_button,
+                      FALSE, FALSE, 0);
+  /*g_signal_connect (frame->priv->go_up_button,
+                    "clicked",
+                    G_CALLBACK (on_go_up_button_clicked),
+                    frame);*/
+
+  priv->go_down_button = create_button_from_symbolic ("go-down-symbolic");
+  gtk_widget_show (priv->go_down_button);
+  gtk_box_pack_start (GTK_BOX (search_widget), priv->go_down_button,
+                      FALSE, FALSE, 0);
+  /*g_signal_connect (frame->priv->go_down_button,
+                    "clicked",
+                    G_CALLBACK (on_go_down_button_clicked),
+                    frame);*/
+
+  return search_widget;
+}
+
 /* public API */
 
 /**
@@ -415,4 +520,23 @@ terminal_screen_container_set_placement (TerminalScreenContainer *container,
 
   terminal_screen_container_set_placement_internal (container, corner);
   terminal_screen_container_set_placement_set (container, TRUE);
+}
+
+void
+terminal_screen_container_present_search (TerminalScreenContainer *container)
+{
+  TerminalScreenContainerPrivate *priv;
+
+  g_return_if_fail (TERMINAL_IS_SCREEN_CONTAINER (container));
+
+  priv = container->priv;
+
+  if (gtk_bin_get_child (GTK_BIN (priv->slider)) == NULL)
+    gtk_container_add (GTK_CONTAINER (priv->slider),
+                       create_search_widget (container));
+
+  /* To slide in we set the right animation state in the animatable */
+  g_object_set (G_OBJECT (priv->slider),
+                "animation-state", GEDIT_THEATRICS_ANIMATION_STATE_COMING,
+                NULL);
 }

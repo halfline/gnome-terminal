@@ -64,6 +64,8 @@ void terminal_screen_container_set_policy (TerminalScreenContainer *container,
 void terminal_screen_container_set_placement (TerminalScreenContainer *container,
                                               GtkCornerType corner);
 
+void terminal_screen_container_present_search (TerminalScreenContainer *container);
+
 G_END_DECLS
 
 #endif /* TERMINAL_SCREEN_CONTAINER_H */
