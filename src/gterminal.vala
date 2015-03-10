@@ -416,6 +416,7 @@ namespace GTerminal
                                                     OpenOptions.role,
                                                     OpenOptions.profile,
                                                     null /* title */,
+                                                    true,
                                                     OpenOptions.maximise,
                                                     OpenOptions.fullscreen);
     if (OpenOptions.show_menubar_set)
