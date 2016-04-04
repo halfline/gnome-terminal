@@ -122,11 +122,6 @@ main (int argc, char **argv)
 
   terminal_i18n_init (TRUE);
 
-  if (!g_get_charset (NULL)) {
-    g_printerr ("Non UTF-8 locale is not supported!\n");
-    return _EXIT_FAILURE_NO_UTF8;
-  }
-
   /* Sanitise environment */
   g_unsetenv ("DBUS_STARTER_BUS_TYPE");
 
